@@ -35,8 +35,9 @@ async def mock_backend_handler():
 
 
 class GabberHandler(gabber.realtime_session.RealtimeSessionHandler):
-    def __init__(self):
+    def __init__(self, *, connected_future: asyncio.Future[None]):
         super().__init__()
+        self._connected_future = connected_future
         self._messages = []
 
     def messages_changed(self, messages):
@@ -54,11 +55,13 @@ class GabberHandler(gabber.realtime_session.RealtimeSessionHandler):
 
     def connection_state_changed(self, state: gabber.api_types.SDKConnectionState):
         print(f"Connection state changed: {state}")
+        self._connected_future.set_result(None)
 
 
 async def main():
+    connected_future = asyncio.Future()
     gabber_realtime_session = gabber.realtime_session.RealtimeSession(
-        handler=GabberHandler()
+        handler=GabberHandler(connected_future=connected_future)
     )
 
     backend_res = await mock_backend_handler()
@@ -87,6 +90,14 @@ async def main():
     ut_opts = gabber.api_types.SDKConnectOptionsOneOf1(token=usage_token, config=config)
     opts.actual_instance = ut_opts
     await gabber_realtime_session.connect(opts=opts)
+
+    logging.info(
+        "Connected to the Gabber Realtime Session, waiting for agent to join..."
+    )
+
+    await connected_future
+
+    logging.info("Agent joined!")
 
     async def receive_task():
         with wave.open("agent_output.wav", "wb") as wf:

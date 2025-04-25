@@ -45,6 +45,11 @@ class RealtimeSession:
         self._agent_participant: rtc.RemoteParticipant | None = None
         self._agent_audio_track: rtc.RemoteAudioTrack | None = None
         self._agent_audio_task: asyncio.Task | None = None
+        self._microphone_task: asyncio.Task | None = None
+        self._microphone_source = rtc.AudioSource(48000, 1)
+        self._microphone_track = rtc.LocalAudioTrack.create_audio_track(
+            "microphone", self._microphone_source
+        )
 
     async def connect(self, *, opts: api_types.SDKConnectOptions):
         self._handler.connection_state_changed(api_types.SDKConnectionState.CONNECTED)
@@ -71,6 +76,12 @@ class RealtimeSession:
             )
             logging.error(f"Failed to connect to room: {e}")
             self._handler.agent_error(str(e))
+
+        await self._room.local_participant.publish_track(
+            track=self._microphone_track,
+            options=rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_MICROPHONE),
+        )
+        self._microphone_task = asyncio.create_task(self._microphone_loop())
 
     async def disconnect(self):
         await self._room.disconnect()
@@ -102,6 +113,9 @@ class RealtimeSession:
         str_data = data.data.decode("utf-8")
         if data.topic == "message":
             t = api_types.SDKSessionTranscription.from_json(str_data)
+            if t is None:
+                logging.error(f"Failed to parse message: {str_data}")
+                return
             self._messages.append(t)
             self._handler.messages_changed(self._messages)
         elif data.topic == "error":
@@ -159,6 +173,20 @@ class RealtimeSession:
         stream = rtc.AudioStream(self._agent_audio_track)
         async for frame in stream:
             self._audio_stream._push_audio(frame=bytes(frame.frame.data))
+
+    async def _microphone_loop(self):
+        async for frame in self._microphone:
+            try:
+                f = rtc.AudioFrame(
+                    data=frame,
+                    sample_rate=48000,
+                    num_channels=1,
+                    samples_per_channel=len(frame) // 2,
+                )
+                logging.info(f"Microphone frame: {f}")
+                await self._microphone_source.capture_frame(frame=f)
+            except Exception as e:
+                logging.error(f"Failed to push audio frame: {e}")
 
 
 class AudioFrameStream:
