@@ -1,5 +1,5 @@
 [project]
-name = "gabber"
+name = "gabber-sdk"
 version = "0.1.0"
 description = "A short description of my package"
 readme = "README.md"
@@ -22,3 +22,6 @@ build-backend = "hatchling.build"
 [project.urls]
 Homepage = "https://github.com/gabber-dev/sdk-python"
 Repository = "https://github.com/gabber-dev/sdk-python"
+
+[tool.hatch.build.targets.wheel]
+packages = ["gabber"]

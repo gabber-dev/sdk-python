@@ -42,24 +42,25 @@ class GabberHandler(gabber.realtime_session.RealtimeSessionHandler):
 
     def messages_changed(self, messages):
         self._messages = messages
-        print(f"Messages changed: {messages}")
 
     def agent_error(self, msg: str):
-        print(f"Agent error: {msg}")
+        logging.error(f"Agent error: {msg}")
 
     def remaining_seconds_changed(self, seconds: int):
-        print(f"Remaining seconds changed: {seconds}")
+        pass
 
     def agent_state_changed(self, state: gabber.api_types.SDKAgentState):
-        print(f"Agent state changed: {state}")
+        logging.info(f"Agent state changed: {state}")
 
     def connection_state_changed(self, state: gabber.api_types.SDKConnectionState):
-        print(f"Connection state changed: {state}")
-        self._connected_future.set_result(None)
+        logging.info(f"Connection state changed: {state}")
+        if state == gabber.api_types.SDKConnectionState.CONNECTED:
+            print("NEIL setting res")
+            self._connected_future.set_result(None)
 
 
 async def main():
-    connected_future = asyncio.Future()
+    connected_future = asyncio.Future[None]()
     gabber_realtime_session = gabber.realtime_session.RealtimeSession(
         handler=GabberHandler(connected_future=connected_future)
     )
@@ -116,7 +117,7 @@ async def main():
             with wave.open("hello_world.wav", "rb") as wf:
                 audio_data = wf.readframes(wf.getnframes())
                 gabber_realtime_session.microphone.push_audio(audio_data)
-            await asyncio.sleep(10)
+            await asyncio.sleep(20)
 
     except KeyboardInterrupt:
         logging.info("Stopping the session")

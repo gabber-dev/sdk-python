@@ -52,7 +52,7 @@ class RealtimeSession:
         )
 
     async def connect(self, *, opts: api_types.SDKConnectOptions):
-        self._handler.connection_state_changed(api_types.SDKConnectionState.CONNECTED)
+        self._handler.connection_state_changed(api_types.SDKConnectionState.CONNECTING)
         connection_details: api_types.RealtimeSessionConnectionDetails
         if isinstance(opts.actual_instance, api_types.SDKConnectOptionsOneOf):
             connection_details = opts.actual_instance.connection_details
@@ -143,17 +143,13 @@ class RealtimeSession:
         if track.kind != rtc.TrackKind.KIND_AUDIO:
             return
 
-        logging.info("NEIL got track")
         if self._agent_participant is None:
             self._agent_participant = participant
-
-        logging.info("NEIL got track 2")
 
         self._agent_audio_track = cast(rtc.RemoteAudioTrack, track)
         if self._agent_audio_task is not None:
             self._agent_audio_task.cancel()
 
-        logging.info("NEIL got track 3")
         self._agent_audio_task = asyncio.create_task(self._process_audio())
         self._handler.connection_state_changed(api_types.SDKConnectionState.CONNECTED)
 
