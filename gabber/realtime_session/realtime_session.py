@@ -125,7 +125,6 @@ class RealtimeSession:
     def _on_participant_metadata_changed(
         self, participant: rtc.Participant, old_metadata: str, metadata: str
     ):
-        print("NEIL got md", participant, metadata)
         if metadata == "":
             return
         json_md = json.loads(metadata)
@@ -137,26 +136,24 @@ class RealtimeSession:
 
     def _on_track_subscribed(
         self,
-        room: rtc.Room,
-        participant: rtc.RemoteParticipant,
+        track: rtc.Track,
         publication: rtc.TrackPublication,
+        participant: rtc.RemoteParticipant,
     ):
-        if publication.kind != "audio":
+        if track.kind != rtc.TrackKind.KIND_AUDIO:
             return
 
+        logging.info("NEIL got track")
         if self._agent_participant is None:
             self._agent_participant = participant
 
-        if not publication.track:
-            logging.error(
-                f"No track to subscribe to for participant {participant.identity}"
-            )
-            return
+        logging.info("NEIL got track 2")
 
-        self._agent_audio_track = cast(rtc.RemoteAudioTrack, publication.track)
+        self._agent_audio_track = cast(rtc.RemoteAudioTrack, track)
         if self._agent_audio_task is not None:
             self._agent_audio_task.cancel()
 
+        logging.info("NEIL got track 3")
         self._agent_audio_task = asyncio.create_task(self._process_audio())
         self._handler.connection_state_changed(api_types.SDKConnectionState.CONNECTED)
 
@@ -168,11 +165,17 @@ class RealtimeSession:
 
     async def _process_audio(self):
         if self._agent_audio_track is None:
+            logging.error("No audio track to process")
             return
 
-        stream = rtc.AudioStream(self._agent_audio_track)
-        async for frame in stream:
-            self._audio_stream._push_audio(frame=bytes(frame.frame.data))
+        try:
+            logging.info("Processing audio")
+            stream = rtc.AudioStream(self._agent_audio_track, sample_rate=24000)
+            async for frame in stream:
+                self._audio_stream._push_audio(frame=bytes(frame.frame.data))
+        except Exception as e:
+            logging.error("Failed to process audio", exc_info=e)
+            self._handler.agent_error(str(e))
 
     async def _microphone_loop(self):
         async for frame in self._microphone:
